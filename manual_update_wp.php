@@ -23,20 +23,20 @@
 function getPackages( $type ){
 
     // Variables to connect
-    $username = 'usuario';
-    $password  = 'senha';
-    $dbname = 'wordpress';
+    $username = 'root';
+    $password  = '123456';
+    $dbname = 'wp';
 
     try {
         $conn = new PDO('mysql:host=localhost;dbname='.$dbname, $username, $password);
         $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-        $stmt = $conn->prepare('SELECT meta_key, meta_value FROM wp_sitemeta WHERE meta_key = :meta AND site_id = 1');
+        $stmt = $conn->prepare('SELECT option_name, option_value FROM wp_options WHERE option_name = :meta');
         $stmt->execute(array('meta' => '_site_transient_update_'.$type));
 
         $result = $stmt->fetch(PDO::FETCH_NAMED);
 
-        $result = mbUnserialize($result["meta_value"]);
+        $result = mbUnserialize($result["option_value"]);
 
         if ( count($result) )
             return $result;
@@ -44,7 +44,9 @@ function getPackages( $type ){
             return false;
 
     }catch(PDOException $e) {
-        return 'ERROR: ' . $e->getMessage();
+
+        echo 'ERROR: ' . $e->getMessage();
+        flush();
     }
 }
 
@@ -61,8 +63,6 @@ function mbUnserialize($string) {
  */
 function filterTranslationsForUpdate($packages) {
 
-//    $packages = getPackages($type);
-
     if( !empty($packages->translations) ) {
 
         $new_packages = new ArrayObject();
@@ -75,7 +75,6 @@ function filterTranslationsForUpdate($packages) {
             $new_package->file_path = "languages/" . $package['type'] . "s/"; // directory for save
 
             $new_packages->append($new_package);
-
         }
 
         return $new_packages;
@@ -85,32 +84,46 @@ function filterTranslationsForUpdate($packages) {
 }
 
 function filterPackagesForUpdate($packages, $type) {
-    //ob_implicit_flush(true);
-//    $packages = getPackages($type);
+
+    $new_packages = new ArrayObject();
+
+//    $packages->response = (object) $packages->response;
+
+//    var_dump($packages->response);
 
     if( !empty($packages->response) ) {
 
-        $new_packages = new ArrayObject();
-
         foreach ($packages->response as $package) {
 
+            $new_package = new ArrayObject();
+
+            if( $type == 'themes') {
+                $new_package->slug      = $package['theme'];// name folder
+                $new_package->package   = $package['package']; // url for download
+                $package = $new_package;
+            }
+
+            $new_package->type      = $type; // plugin, theme or core[
             $package->file_path = $type . '/';
             $new_packages->append($package);
         }
-        return $new_packages;
+    } else if( $type == 'core') {
+        $new_package = new ArrayObject();
 
-    } else {
-        echo "Nenhum {$type} para traducao  encontrado! \n";
-        flush();
+        $new_package->slug      = 'wordpress'; // name folder
+        $new_package->package   = $packages->updates[0]->download; // url for download
+        $new_package->type      = $type; // plugin, theme or core
+        $new_package->file_path = "wordpress"; // directory for save
+
+        $new_packages->append($new_package);
     }
 
-    return false;
+    return $new_packages;
 }
 
 
 function progressCallback( $resource, $download_size, $downloaded_size, $upload_size, $uploaded_size )
 {
-    //ob_implicit_flush(true);
 
     static $previousProgress = 0;
 
@@ -120,36 +133,33 @@ function progressCallback( $resource, $download_size, $downloaded_size, $upload_
     }
     else
         $progress = round( $downloaded_size * 100 / $download_size );
-//        $progress = $downloaded_size / $download_size * 100;
 
     if ( $progress > $previousProgress)
     {
-        echo $progress . "% ";
+        echo "|";
+        if( $progress == 100)
+            echo $progress . "% \n";
+
         flush();
         $previousProgress = $progress;
-//        $fp = fopen( 'progress.txt', 'a' );
-//        fputs( $fp, "$progress\n" );
-//        fclose( $fp );
     }
 }
 
 function extract_and_save_package($package) {
-    //ob_implicit_flush(true);
 
     // current directory
     if( is_writable(getcwd()) ) {
 
         // cria o diretório
-        if( !file_exists($package->file_path))
+        if( !file_exists($package->file_path) && !empty($package->file_path))
             mkdir($package->file_path);
 
         echo "Baixando " . $package->package . " para " . $package->file_path. "\n";
         flush();
 
         // baixa o arquivo
-//        file_put_contents( $package->slug . ".zip", fopen($package->package, 'r'));
 
-        file_put_contents( 'progress.txt', '' );
+        //file_put_contents( 'progress.txt', '' );
         $targetFile = fopen( $package->slug . ".zip", 'w' );
         $ch = curl_init( $package->package );
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -185,7 +195,7 @@ function extract_and_save_package($package) {
 function updatePackages() {
 
 
-    $updates = array('themes', 'plugins', 'core');
+    $updates = array('themes','plugins','core');
 
     foreach ( $updates as $update) {
 
@@ -193,28 +203,29 @@ function updatePackages() {
         $packages = getPackages( $update );
 
         // filtrar o que deve ser atualizado
-        $packages_for_update = filterPackagesForUpdate($packages, $update );
+        if( is_object( $packages ) ) {
+                $packages_for_update = filterPackagesForUpdate($packages, $update );
 
-        // loop com os pacotes para atualizacao
-        if ( is_object( $packages_for_update )) {
+            // loop com os pacotes para atualizacao
+            if ( is_object( $packages_for_update )) {
 
-            foreach ( $packages_for_update as $package ) {
-                extract_and_save_package($package);
-
+                foreach ( $packages_for_update as $package ) {
+                    extract_and_save_package($package);
+                }
             }
 
-        }
+            // salvar as traducoes disponiveis deste tipo de pacote, se é plugin ou tema
+            $translations = filterTranslationsForUpdate($packages);
 
-        // salvar as traducoes disponiveis deste tipo de pacote, se é plugin ou tema
-        $translations = filterTranslationsForUpdate($packages);
+            if ( is_object( $translations ) ) {
 
-        if ( is_object( $translations ) ) {
+                foreach ($translations as $translate) {
 
-            foreach ($translations as $translate) {
+                    extract_and_save_package($translate);
 
-                extract_and_save_package($translate);
-
+                }
             }
+
         }
 
     }
