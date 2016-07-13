@@ -1,4 +1,4 @@
 .idea
-wordpress
-plugins
-themes
+backups
+downloaded
+*.zip

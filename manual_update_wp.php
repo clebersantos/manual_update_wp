@@ -1,10 +1,12 @@
 <?php
 /**
  * Em construção! Recomendo atualização automática nativa do Wordpress! ;)
- *
- *
+ * Para atualização consulte a página de recomendações do Wordpress
+ * Faça backup da base de dados antes de atualizar
+ * Não recomendo para versões muito antigas, nesses casos é recomendável fazer atualização de versão por versão. Exemplo: 4.1 para 4.2 para 4.3 para 4.4 ....
  * @package manual_update_wp
  */
+
 
 /**
  * Description: Baixar todos os temas, plugins e traduções disponíveis para atualização..
@@ -25,13 +27,20 @@ function getPackages( $type ){
     // Variables to connect
     $username = 'root';
     $password  = '123456';
-    $dbname = 'wp';
-
+    $dbname = 'wordpress';
     try {
         $conn = new PDO('mysql:host=localhost;dbname='.$dbname, $username, $password);
         $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-        $stmt = $conn->prepare('SELECT option_name, option_value FROM wp_options WHERE option_name = :meta');
+        // verificar se tabela existe 'wp_options', algumas versões mais antigas do Wordpress não possui
+        $table_exists = $conn->query("SHOW TABLES LIKE 'wp_sitemeta'")->rowCount() > 0;
+
+        if($table_exists) {
+            $stmt = $conn->prepare('SELECT meta_key, meta_value as option_value FROM wp_sitemeta WHERE meta_key = :meta AND site_id = 1');
+        }else {
+            $stmt = $conn->prepare('SELECT option_name, option_value FROM wp_options WHERE option_name = :meta');
+        }
+
         $stmt->execute(array('meta' => '_site_transient_update_'.$type));
 
         $result = $stmt->fetch(PDO::FETCH_NAMED);
@@ -69,27 +78,22 @@ function filterTranslationsForUpdate($packages) {
 
         foreach ($packages->translations as $package) {
             $new_package = new stdClass();
-            $new_package->slug      = $package['slug']; // name folder plugin
-            $new_package->package  = $package['package']; // url for download
-            $new_package->type      = $package['type']; // plugin, theme or core
-            $new_package->file_path = "languages/" . $package['type'] . "s/"; // directory for save
+            $new_package->slug = $package['slug']; // name folder plugin
+            $new_package->package = $package['package']; // url for download
+            $new_package->type = $package['type']; // plugin, theme or core
+            $new_package->file_path = "downloaded/wp-content/languages/" . $package['type'] . "s/"; // directory for save
 
             $new_packages->append($new_package);
         }
 
         return $new_packages;
     }
-
     return false;
 }
 
 function filterPackagesForUpdate($packages, $type) {
 
     $new_packages = new ArrayObject();
-
-//    $packages->response = (object) $packages->response;
-
-//    var_dump($packages->response);
 
     if( !empty($packages->response) ) {
 
@@ -104,18 +108,22 @@ function filterPackagesForUpdate($packages, $type) {
             }
 
             $new_package->type      = $type; // plugin, theme or core[
-            $package->file_path = $type . '/';
+            $package->file_path = 'downloaded/wp-content/'. $type;
             $new_packages->append($package);
         }
-    } else if( $type == 'core') {
+    } else if( $type == 'core' && $packages->updates[0]->response == 'upgrade' ) {
+
         $new_package = new ArrayObject();
 
-        $new_package->slug      = 'wordpress'; // name folder
-        $new_package->package   = $packages->updates[0]->download; // url for download
-        $new_package->type      = $type; // plugin, theme or core
-        $new_package->file_path = "wordpress"; // directory for save
+        $new_package->slug = 'wordpress'; // name folder
+        $new_package->package = $packages->updates[0]->download; // url for download
+        $new_package->type = $type; // plugin, theme or core
+        $new_package->file_path = "downloaded/"; // directory for save
 
         $new_packages->append($new_package);
+    }else {
+        echo "Nenhum {$type} encontrado para atualização!\n";
+        flush();
     }
 
     return $new_packages;
@@ -150,14 +158,8 @@ function extract_and_save_package($package) {
     // current directory
     if( is_writable(getcwd()) ) {
 
-        // cria o diretório
-        if( !file_exists($package->file_path) && !empty($package->file_path))
-            mkdir($package->file_path);
-
         echo "Baixando " . $package->package . " para " . $package->file_path. "\n";
         flush();
-
-        // baixa o arquivo
 
         //file_put_contents( 'progress.txt', '' );
         $targetFile = fopen( $package->slug . ".zip", 'w' );
@@ -176,13 +178,13 @@ function extract_and_save_package($package) {
             $zip->extractTo($package->file_path);
             $zip->close();
 
-            // apaga o arquivo
-            unlink($package->slug . ".zip"); //remove arquivo
+            // remove o arquivo
+            unlink($package->slug . ".zip");
 
-            echo $package->slug . " extraído!\n";
+            echo $package->slug . " extraído!\n\n";
             flush();
         } else {
-            echo "Extração do arquivo falhou! \n";
+            echo "Extração do arquivo falhou! \n\n";
             flush();
         }
 
@@ -194,8 +196,7 @@ function extract_and_save_package($package) {
 
 function updatePackages() {
 
-
-    $updates = array('themes','plugins','core');
+    $updates = array('core', 'themes', 'plugins');
 
     foreach ( $updates as $update) {
 
@@ -230,7 +231,6 @@ function updatePackages() {
 
     }
 }
-
 
 updatePackages();
 
