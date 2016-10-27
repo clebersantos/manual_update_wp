@@ -1,26 +1,54 @@
 #!/bin/bash
 # manual_update_wp.sh
 
-######### Variáveis ############
-######
-###
+######### PEGA VARIÁVEIS ############
+DEFAULT_ORIGIN=`pwd`
+DEFAULT_BACKUP='/home/backups'
+SCRIPT_PWD=`dirname $0`
 
-	# data para o backup
-	DATA=`/bin/date +%Y%m%d%H%M`
+echo "Digite a origem:"
+echo "[padrão: $DEFAULT_ORIGIN]"
+read DIR_ORIGIN
 
-	# diretorio que os arquivos serao salvos
-	DIR_ORIGIN=$PWD
+if [ -z $DIR_ORIGIN ]; then
+    DIR_ORIGIN=$DEFAULT_ORIGIN
+fi
+if [ ! -d "$DIR_ORIGIN" ]; then
+    echo "$DIR_ORIGIN não é um diretório válido ou não existe."
+    echo "Criar (S/n)?"
+    read CRIAR_ORIGIN
+    if [[ $CRIAR_ORIGIN = "s" ]]; then
+	mkdir -p $DIR_ORIGIN
+    elif [[ $CRIAR_ORIGIN = "n" ]]; then
+	exit 0
+    else
+	# acao padrao
+	mkdir -p $DIR_ORIGIN
+    fi
+fi
 
-###
-######
-######### Altere aqui para o seu diretorio ########
-######
-###
-	# nome do site
-	SITE_NAME="buddypress"
+echo "Digite o diretório de backup:"
+echo "[padrão: $DEFAULT_BACKUP]"
+read DIR_BACKUP
+if [ -z $DIR_BACKUP ]; then
+    DIR_BACKUP=$DEFAULT_BACKUP
+fi
+if [ ! -d "$DIR_BACKUP" ]; then
+    echo "$DIR_BACKUP não é um diretório válido ou não existe."
+    echo "Criar (S/n)?"
+    read CRIAR_BACKUP
+    if [[ $CRIAR = "s" ]]; then
+	mkdir -p $DIR_BACKUP
+    elif [[ $CRIAR_BACKUP = "n" ]]; then
+	exit 0
+    else
+	# acao padrao
+	mkdir -p $DIR_BACKUP
+    fi    
+fi
 
-	# diretório do site para backup e atualizar
-	SITE_PATH='/var/www/buddypress/' # coloque a barra no final ex: /var/www/cdigital/
+# data para o backup
+DATA=`/bin/date +%Y%m%d%H%M`
 
 ####
 ######
@@ -28,51 +56,55 @@
 
 # fazer download dos arquivos
 echo -en "- Fazer download dos temas, plugins e core (y/n)? "
-read answer1
-if echo "$answer1" | grep -iq "^y" ;then
-   rm -r downloaded
-   php $PWD'/manual_update_wp.php' 
+read ANSWER1
+if echo "$ANSWER1" | grep -iq "^y" ;then
+    if [ ! -d "$DIR_ORIGIN/downloaded" ]; then
+	mkdir $DIR_ORIGIN/downloaded
+    else
+	rm -r $DIR_ORIGIN/downloaded
+    fi
+    
+    ## baixa plugins desatualizados
+    php $SCRIPT_PWD/manual_update_wp.php
 fi
 
 # apos baixar todas os pacotes, perguntar para o usuario se deseja atualizar
-echo -en "\nAtenção!!!\n- Verifique se os arquivos para cópia estão corretos.\n- Antes de copiar será feito backup dos arquivos.\n- Deseja copiar os arquivos para "$SITE_PATH" (y/n)? "
-read answer
-if echo "$answer" | grep -iq "^y" ;then
-   
+echo -en "\nAtenção!!!\n- Verifique se os arquivos para cópia estão corretos.\n- Antes de copiar será feito backup dos arquivos.\n- Deseja copiar os arquivos para "$DIR_ORIGIM" (y/n)? "
+read ANSWER2
+if echo "$ANSWER2" | grep -iq "^y" ;then
+    
     # BACKUP
-    echo -en "Fazer backup do wordpress "$SITE_NAME" (y/n)? "
-    read answer_backup
-    if echo "$answer_backup" | grep -iq "^y" ;then
-	    
-		# Cria o diretório para backup
-		mkdir -p $DIR_ORIGIN/backups/$SITE_NAME/$DATA/
-
-		# Faz uma copia do wordpress atual exceto blogs.dir
-		echo "Fazendo backup do wordpress "$SITE_NAME
-
-		#echo $DIR_ORIGIN/backups/$SITE_NAME/$DATA/.
-		# MUITO CUIDADO COM O RSYNC
-		rsync -av --progress $SITE_PATH $DIR_ORIGIN/backups/$SITE_NAME/$DATA/. --exclude blogs.dir
-		echo "Backup realizado!"
-	fi
-	# FIM BACKUP
-
-
-	# copiar para o diretorio
-	echo "Copiando arquivos para "$SITE_PATH
-
-	cp -avr $DIR_ORIGIN/downloaded/wordpress/* $SITE_PATH.
-
-	echo "Atualizacao wordpress ok"
-
-	# atualizar plugins e temas
-	echo "Atualizando plugins, temas e traduções!"
-	cp -avr $DIR_ORIGIN/downloaded/wp-content/* $SITE_PATH/wp-content/.
-	echo "Plugins, temas e traduções atualizados!"
-
-
-	echo "Atualizacao finalizada! :)"
-
+    echo -en "Fazer backup do wordpress "$DIR_ORIGIN" (y/n)? "
+    read ANSWER_BACKUP
+    if echo "$ANSWER_BACKUP" | grep -iq "^y" ;then
+	
+	# Cria o diretório para backup
+	mkdir -p $DIR_BACKUP/$DATA/
+	
+	# Faz uma copia do wordpress atual exceto blogs.dir
+	echo "Fazendo backup do wordpress "$DIR_ORIGIN
+	
+	rsync -av --progress $DIR_ORIGIN $DIR_BACKUP/$DATA/. --exclude blogs.dir
+	echo "Backup realizado!"
+    fi
+    # FIM BACKUP
+    
+    
+    # copiar para o diretorio
+    echo "Copiando arquivos para "$DIR_PATH
+    
+    cp -avr $DIR_ORIGIN/downloaded/wordpress/* $DIR_ORIGIN
+    
+    echo "Atualizacao wordpress ok"
+    
+    # atualizar plugins e temas
+    echo "Atualizando plugins, temas e traduções!"
+    cp -avr $DIR_ORIGIN/downloaded/wp-content/* $DIR_ORIGIN/wp-content/.
+    echo "Plugins, temas e traduções atualizados!"
+    
+    
+    echo "Atualizacao finalizada! :)"
+    
 else
     echo "Atualização cancelada!"
     exit
