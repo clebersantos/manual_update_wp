@@ -1,0 +1,15 @@
+<?php
+
+function get_connection_data() {
+    // Variables to connect
+    $connection = array(
+        'username' => '',
+        'password' => '',
+        'dbname' => '',
+        'table_prefix' =>'wp_'
+    );
+    
+    return $connection;
+}
+
+?>

@@ -19,26 +19,26 @@
 @ini_set('implicit_flush', 1);
 @ob_end_clean();
 
+require("config.php");
+
 /*
  * Separar conexão daqui depois
  */
 function getPackages( $type ){
 
-    // Variables to connect
-    $username = 'root';
-    $password  = '123456';
-    $dbname = 'wordpress';
+    $connection = get_connection_data();
+    
     try {
-        $conn = new PDO('mysql:host=localhost;dbname='.$dbname, $username, $password);
+        $conn = new PDO('mysql:host=localhost;dbname='.$connection['dbname'], $connection['username'], $connection['password']);
         $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
         // verificar se tabela existe 'wp_options', algumas versões mais antigas do Wordpress não possui
-        $table_exists = $conn->query("SHOW TABLES LIKE 'wp_sitemeta'")->rowCount() > 0;
+        $table_exists = $conn->query("SHOW TABLES LIKE '" . $connection['table_prefix'] . "sitemeta'")->rowCount() > 0;
 
         if($table_exists) {
-            $stmt = $conn->prepare('SELECT meta_key, meta_value as option_value FROM wp_sitemeta WHERE meta_key = :meta AND site_id = 1');
+            $stmt = $conn->prepare("SELECT meta_key, meta_value as option_value FROM " . $connection['table_prefix'] . "sitemeta WHERE meta_key = :meta AND site_id = 1");
         }else {
-            $stmt = $conn->prepare('SELECT option_name, option_value FROM wp_options WHERE option_name = :meta');
+            $stmt = $conn->prepare("SELECT option_name, option_value FROM " . $connection['table_prefix'] . "options WHERE option_name = :meta");
         }
 
         $stmt->execute(array('meta' => '_site_transient_update_'.$type));
