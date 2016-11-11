@@ -29,7 +29,7 @@ function getPackages( $type ){
     $connection = get_connection_data();
     
     try {
-        $conn = new PDO('mysql:host=localhost;dbname='.$connection['dbname'], $connection['username'], $connection['password']);
+        $conn = new PDO('mysql:host=' . $connection['hostname'] . ';dbname='.$connection['dbname'], $connection['username'], $connection['password']);
         $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
         // verificar se tabela existe 'wp_options', algumas versões mais antigas do Wordpress não possui
