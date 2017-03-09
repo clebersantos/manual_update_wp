@@ -63,7 +63,10 @@ function getPackages( $type ){
  * Corrige bug do unserialize do php com caractes especiais
  */
 function mbUnserialize($string) {
-    $string = preg_replace('!s:(\d+):"(.*?)";!se', "'s:'.strlen('$2').':\"$2\";'", $string);
+//    $string = preg_replace('!s:(\d+):"(.*?)";!se', "'s:'.strlen('$2').':\"$2\$
+     $string = preg_replace_callback('!s:(\d+):"(.*?)";!', function($m) {
+      return 's:' . strlen($m[2]) . ':"' . $m[2] . '";';
+}, $string);
     return unserialize($string);
 }
 
